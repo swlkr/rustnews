@@ -1,9 +1,12 @@
+mod db;
+
 use axum::{
     http::{header::CONTENT_TYPE, StatusCode, Uri},
     response::{Html, IntoResponse},
     routing::get,
     Router,
 };
+use db::db;
 use enum_router::Routes;
 use hyped::*;
 use static_stash::{Css, Js, StaticFiles};
@@ -11,6 +14,8 @@ use static_stash::{Css, Js, StaticFiles};
 #[tokio::main]
 async fn main() {
     let _ = StaticFile::once();
+    let _ = db().await;
+
     let ip = "127.0.0.1:9006";
     let listener = tokio::net::TcpListener::bind(ip).await.unwrap();
     println!("Listening on {}", ip);
@@ -31,10 +36,11 @@ fn render(element: Element) -> Html<String> {
         doctype(),
         html((
             head((
+                title("social news"),
                 script(()).src(&static_files.htmx),
                 link(()).href(&static_files.tailwind).rel("stylesheet"),
             )),
-            body(element),
+            body(element).class(""),
         )),
     )))
 }

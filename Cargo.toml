@@ -1,5 +1,5 @@
 [package]
-name = "self-hosted-hn-clone"
+name = "tendytime"
 version = "0.1.0"
 edition = "2021"
 
@@ -7,5 +7,7 @@ edition = "2021"
 axum = { version = "0.7.3", features = ["macros"] }
 enum_router = { git = "https://github.com/swlkr/enum_router", version = "0.1.0" }
 hyped = "0.1.0"
+rizz = { version = "0.1.0", path = "../rizz" }
+serde = { version = "1.0.195", features = ["derive"] }
 static_stash = { git = "https://github.com/swlkr/static_stash", version = "0.1.0" }
 tokio = { version = "1.35.1", features = ["rt-multi-thread", "macros"] }
