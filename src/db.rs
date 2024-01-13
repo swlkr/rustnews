@@ -11,7 +11,6 @@ pub async fn db() -> &'static Database {
             let connection = Connection::new("db.sqlite3")
                 .create_if_missing(true)
                 .journal_mode(JournalMode::Wal)
-                .foreign_keys(true)
                 .synchronous(Synchronous::Normal)
                 .open()
                 .await
@@ -38,7 +37,7 @@ async fn migrate(db: &Database) -> Result<(), Box<dyn std::error::Error>> {
 
 #[derive(Table, Clone, Copy)]
 #[rizz(table = "users")]
-struct Users {
+pub struct Users {
     #[rizz(primary_key, not_null)]
     id: Text,
     #[rizz(not_null)]
@@ -50,7 +49,7 @@ struct Users {
 }
 
 #[derive(Serialize, Deserialize)]
-struct User {
+pub struct User {
     id: String,
     name: String,
     secret: String,

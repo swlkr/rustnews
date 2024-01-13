@@ -1,14 +1,15 @@
+mod components;
 mod db;
 
 use axum::{
     http::{header::CONTENT_TYPE, StatusCode, Uri},
-    response::{Html, IntoResponse},
+    response::IntoResponse,
     routing::get,
     Router,
 };
-use db::db;
+use components::*;
+use db::*;
 use enum_router::Routes;
-use hyped::*;
 use static_stash::{Css, Js, StaticFiles};
 
 #[tokio::main]
@@ -27,23 +28,10 @@ fn routes() -> Router {
 }
 
 async fn index() -> impl IntoResponse {
-    render(h1("self hosted hn clone").class("text-2xl text-center"))
+    let divs = (0..1000).map(|i| div(i).class("py-96")).collect::<Vec<_>>();
+    render((h1("rust news").class("text-2xl text-center"), divs))
 }
 
-fn render(element: Element) -> Html<String> {
-    let static_files = StaticFile::once();
-    Html(hyped::render((
-        doctype(),
-        html((
-            head((
-                title("social news"),
-                script(()).src(&static_files.htmx),
-                link(()).href(&static_files.tailwind).rel("stylesheet"),
-            )),
-            body(element).class(""),
-        )),
-    )))
-}
 async fn serve_file(uri: Uri) -> impl IntoResponse {
     let static_files = StaticFile::once();
     match static_files.get(&uri.path()) {
