@@ -6,6 +6,7 @@ use axum::{
 };
 use enum_router::Routes;
 use hyped::*;
+use rizz::{eq, gt_or_eq};
 use rustnews::*;
 use static_stash::{Css, Js, StaticFiles};
 use std::time::Duration;
@@ -51,6 +52,7 @@ async fn index() -> Result<impl IntoResponse> {
         .select()
         .from(posts)
         .order(vec![desc(posts.created_at)])
+        .r#where(gt_or_eq(posts.created_at, now() - DAY))
         .all()
         .await?;
 
@@ -102,10 +104,14 @@ pub fn render(element: impl Render + 'static) -> Result<Html<String>> {
         html((
             head((
                 title("rust news"),
+                meta().charset("UTF-8"),
+                meta()
+                    .name("viewport")
+                    .content("width=device-width, initial-scale=1"),
                 script(()).src(&files.htmx),
                 link(()).href(&files.tailwind).rel("stylesheet"),
             )),
-            body(hyped::main(element).class("max-w-2xl mx-auto"))
+            body(hyped::main(element).class("max-w-2xl mx-auto px-8 lg:px-0"))
                 .class("dark:bg-gray-950 dark:text-white bg-gray-50 text-slate-950 pb-8"),
         )),
     ))))
@@ -141,15 +147,16 @@ fn now() -> u64 {
     now.duration_since(UNIX_EPOCH).unwrap().as_secs()
 }
 
+const YEAR: u64 = 31_536_000;
+const MONTH: u64 = 2_592_000;
+const DAY: u64 = 86_400;
+const HOUR: u64 = 3600;
+const MINUTE: u64 = 60;
+
 fn time_ago(seconds: u64) -> impl Render {
     let now = now();
     let seconds = now - seconds;
 
-    const YEAR: u64 = 31_536_000;
-    const MONTH: u64 = 2_592_000;
-    const DAY: u64 = 86_400;
-    const HOUR: u64 = 3600;
-    const MINUTE: u64 = 60;
     let diff = seconds / YEAR;
     if diff > 0 {
         return format!("{}y ago", diff);

@@ -2,6 +2,7 @@
 name = "rustnews"
 version = "0.1.0"
 edition = "2021"
+default-run = "rustnews"
 
 [dependencies]
 axum = { version = "0.7.3", features = ["macros"] }
