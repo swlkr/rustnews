@@ -117,9 +117,13 @@ fn render_post(post: Post) -> Element {
         div((
             div(time_ago(post.created_at)),
             div("·"),
-            link(post.source_display()).href(post.source_link),
+            if post.source_link.is_empty() {
+                div(post.source_display())
+            } else {
+                a(post.source_display()).href(post.source_link)
+            },
         ))
-        .class("flex gap-2"),
+        .class("flex gap-1"),
     ))
     .class("flex flex-col gap-1")
 }
@@ -128,7 +132,7 @@ fn a(s: impl Render + 'static) -> Element {
     hyped::a(s)
         .rel("noreferrer noopener")
         .target("_blank")
-        .class("underline dark:text-orange-400 text-orange-500")
+        .class("underline dark:text-orange-400 text-orange-500 w-fit")
 }
 
 fn now() -> u64 {

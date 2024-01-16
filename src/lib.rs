@@ -167,11 +167,21 @@ async fn download(url: &'static str) -> Result<()> {
     let xml = fetch(url)?;
     let feed = atom_feed(&xml)?;
     for entry in feed.entry {
+        let source_link = match entry.id {
+            Some(s) => {
+                if s.starts_with("https://") {
+                    s
+                } else {
+                    String::with_capacity(0)
+                }
+            }
+            None => String::with_capacity(0),
+        };
         let post = Post {
             id: ulid(),
             source: url.to_owned(),
             title: entry.title,
-            source_link: entry.id.unwrap_or_default(),
+            source_link,
             link: entry.link.href,
             created_at: to_seconds(&entry.updated.unwrap_or_default()).unwrap_or_default(),
         };
