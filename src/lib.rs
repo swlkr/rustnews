@@ -143,7 +143,7 @@ impl Post {
         match self.source.as_str() {
             "https://blog.rust-lang.org/feed.xml" => "official rust blog",
             "https://this-week-in-rust.org/atom.xml" => "this week in rust",
-            "https://reddit.com/r/rust.xml" => "/r/rust",
+            "https://reddit.com/r/rust/.rss" => "/r/rust",
             "https://hnrss.org/newest.atom?q=rust" => "hn",
             _ => "Unknown",
         }
@@ -154,7 +154,7 @@ pub async fn import() -> Result<()> {
     println!("Importing atom feeds");
     download("https://blog.rust-lang.org/feed.xml").await?;
     download("https://this-week-in-rust.org/atom.xml").await?;
-    download("https://reddit.com/r/rust.xml").await?;
+    download("https://reddit.com/r/rust/.rss").await?;
     download("https://hnrss.org/newest.atom?q=rust").await?;
     println!("Finished importing atom feeds");
     // YT videos?
