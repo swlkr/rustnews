@@ -5,8 +5,9 @@ edition = "2021"
 
 [dependencies]
 axum = { version = "0.7.3", features = ["macros"] }
+chrono = { version = "0.4.31", features = ["serde"] }
 enum_router = { git = "https://github.com/swlkr/enum_router", version = "0.1.0" }
-hyped = "0.1.0"
+hyped = { path = "../hyped" }
 rizz = { version = "0.1.0", path = "../rizz" }
 serde = { version = "1.0.195", features = ["derive"] }
 serde-xml-rs = "0.6.0"

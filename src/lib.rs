@@ -2,6 +2,7 @@ use axum::{
     http::StatusCode,
     response::{IntoResponse, Response},
 };
+use chrono::DateTime;
 pub use rizz::desc;
 use rizz::*;
 use serde::{Deserialize, Serialize};
@@ -24,6 +25,10 @@ pub enum Error {
     Ureq(#[from] ureq::Error),
     #[error("xml deserialize error: {0}")]
     DeserializeXml(#[from] serde_xml_rs::Error),
+    #[error("chrono parse error: {0}")]
+    Chrono(#[from] chrono::ParseError),
+    #[error("join error: {0}")]
+    Join(#[from] tokio::task::JoinError),
 }
 
 pub type Result<T> = std::result::Result<T, Error>;
@@ -113,27 +118,45 @@ pub struct Posts {
     #[rizz(primary_key, not_null)]
     pub id: Text,
     #[rizz(not_null)]
+    pub source: Text,
+    #[rizz(not_null)]
     pub title: Text,
     #[rizz(not_null)]
     pub link: Text,
     #[rizz(not_null)]
     pub created_at: Integer,
+    #[rizz(not_null)]
+    pub source_link: Text,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Post {
     pub id: String,
+    pub source: String,
     pub title: String,
     pub link: String,
     pub created_at: u64,
+    pub source_link: String,
+}
+impl Post {
+    pub fn source_display(&self) -> &'static str {
+        match self.source.as_str() {
+            "https://blog.rust-lang.org/feed.xml" => "official rust blog",
+            "https://this-week-in-rust.org/atom.xml" => "this week in rust",
+            "https://reddit.com/r/rust.xml" => "/r/rust",
+            "https://hnrss.org/newest.atom?q=rust" => "hn",
+            _ => "Unknown",
+        }
+    }
 }
 
 pub async fn import() -> Result<()> {
-    let _x = download("https://blog.rust-lang.org/feed.xml").await?;
-    // TODO: https://blog.rust-lang.org/feed.xml
-    // TODO: https://lib.rs/atom.xml
-    // TODO: https://this-week-in-rust.org/atom.xml
-    // TODO: https://reddit.com/r/rust.json
+    println!("Importing atom feeds");
+    download("https://blog.rust-lang.org/feed.xml").await?;
+    download("https://this-week-in-rust.org/atom.xml").await?;
+    download("https://reddit.com/r/rust.xml").await?;
+    download("https://hnrss.org/newest.atom?q=rust").await?;
+    println!("Finished importing atom feeds");
     // YT videos?
     // hacker news links?
     Ok(())
@@ -146,14 +169,30 @@ async fn download(url: &'static str) -> Result<()> {
     for entry in feed.entry {
         let post = Post {
             id: ulid(),
+            source: url.to_owned(),
             title: entry.title,
+            source_link: entry.id.unwrap_or_default(),
             link: entry.link.href,
-            created_at: 0,
+            created_at: to_seconds(&entry.updated.unwrap_or_default()).unwrap_or_default(),
         };
-        let _rows_affected = db.insert(posts).values(post)?.rows_affected().await?;
+        let _rows_affected = match db.insert(posts).values(post)?.rows_affected().await {
+            Ok(_) => {}
+            Err(err) => match err {
+                rizz::Error::UniqueConstraint(_x) => {
+                    // ignore unique constraint violations because i don't care
+                }
+                _ => {
+                    return Err(err.into());
+                }
+            },
+        };
     }
 
     Ok(())
+}
+
+fn to_seconds(input: &str) -> Result<u64> {
+    Ok(DateTime::parse_from_rfc3339(input)?.timestamp() as u64)
 }
 
 fn ulid() -> String {
@@ -163,6 +202,7 @@ fn ulid() -> String {
 fn fetch(url: &'static str) -> Result<String> {
     Ok(ureq::get(url).call()?.into_string()?)
 }
+
 #[derive(Debug, Deserialize)]
 pub struct AtomFeed {
     pub title: String,
@@ -173,7 +213,9 @@ pub struct AtomFeed {
 pub struct Entry {
     pub title: String,
     pub link: Link,
-    pub content: String,
+    pub content: Option<String>,
+    pub id: Option<String>,
+    pub updated: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
