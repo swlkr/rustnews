@@ -1,19 +1,17 @@
-mod components;
-mod db;
-
 use axum::{
     http::{header::CONTENT_TYPE, StatusCode, Uri},
-    response::IntoResponse,
+    response::{Html, IntoResponse},
     routing::get,
     Router,
 };
-use components::*;
-use db::*;
 use enum_router::Routes;
+use hyped::*;
+use rustnews::*;
 use static_stash::{Css, Js, StaticFiles};
 
 #[tokio::main]
 async fn main() {
+    let _x = import().await;
     let _ = StaticFile::once();
     let _ = db().await;
 
@@ -27,9 +25,22 @@ fn routes() -> Router {
     Route::router().route("/*file", get(serve_file))
 }
 
-async fn index() -> impl IntoResponse {
-    let divs = (0..1000).map(|i| div(i).class("py-96")).collect::<Vec<_>>();
-    render((h1("rust news").class("text-2xl text-center"), divs))
+async fn index() -> Result<impl IntoResponse> {
+    let Database { db, posts } = db().await;
+    let posts: Vec<Post> = db
+        .select()
+        .from(posts)
+        .order(vec![desc(posts.created_at)])
+        .all()
+        .await?;
+
+    render((
+        h1("rust news").class("text-2xl text-center"),
+        posts
+            .into_iter()
+            .map(|post| div(post.title))
+            .collect::<Vec<_>>(),
+    ))
 }
 
 async fn serve_file(uri: Uri) -> impl IntoResponse {
@@ -61,4 +72,19 @@ struct StaticFile {
     htmx: Js,
     #[file("/static/tailwind.css")]
     tailwind: Css,
+}
+
+pub fn render(element: impl Render + 'static) -> Result<Html<String>> {
+    let files = StaticFile::once();
+    Ok(Html(hyped::render((
+        doctype(),
+        html((
+            head((
+                title(""),
+                script(()).src(&files.htmx),
+                link(()).href(&files.tailwind).rel("stylesheet"),
+            )),
+            body(element).class("dark:bg-slate-950 dark:text-white bg-gray-50 text-slate-950"),
+        )),
+    ))))
 }
