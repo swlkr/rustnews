@@ -73,6 +73,13 @@ pub async fn db() -> Result<&'static Database> {
         Some(db) => Ok(db),
         None => {
             let db = Database::new("db.sqlite3").await?;
+            let Database { posts } = &db;
+            db.create(
+                rizz_db::index("posts_link_ix")
+                    .unique()
+                    .on(posts, posts.link),
+            )
+            .await?;
             DATABASE.set(db).unwrap();
             Ok(DATABASE
                 .get()

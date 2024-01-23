@@ -15,13 +15,6 @@ use std::time::Duration;
 async fn main() -> Result<()> {
     let _ = StaticFile::once();
     let db = db().await?;
-    let Database { posts } = &db;
-    db.create(
-        rizz_db::index("posts_link_ix")
-            .unique()
-            .on(posts, posts.link),
-    )
-    .await?;
     let importer = tokio::task::spawn(async {
         let mut interval = tokio::time::interval(Duration::from_secs(3600));
 
