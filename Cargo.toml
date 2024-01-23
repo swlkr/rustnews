@@ -8,8 +8,8 @@ default-run = "rustnews"
 axum = { version = "0.7.3", features = ["macros"] }
 chrono = { version = "0.4.31", features = ["serde"] }
 enum_router = { git = "https://github.com/swlkr/enum_router", version = "0.1.0" }
-hyped = { path = "../hyped" }
-rizz = { version = "0.1.0", path = "../rizz" }
+hyped = { version = "0.1.1" }
+rizz_db = { version = "0.1.0", path = "../rizz" }
 serde = { version = "1.0.195", features = ["derive"] }
 serde-xml-rs = "0.6.0"
 static_stash = { git = "https://github.com/swlkr/static_stash", version = "0.1.0" }

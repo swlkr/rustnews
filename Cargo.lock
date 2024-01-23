@@ -490,7 +490,9 @@ checksum = "df3b46402a9d5adb4c86a0cf463f42e19994e3ee891101b1841f30a545cb49a9"
 
 [[package]]
 name = "hyped"
-version = "0.1.0"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2c1ae71b59ec8e318246a4d33d466b6162d5c4d2bbf74c81e8a802c293ec8605"
 dependencies = [
  "seq-macro",
 ]
@@ -822,10 +824,10 @@ dependencies = [
 ]
 
 [[package]]
-name = "rizz"
+name = "rizz_db"
 version = "0.1.0"
 dependencies = [
- "rizz_macros",
+ "rizz_db_macros",
  "rusqlite",
  "serde",
  "serde_json",
@@ -835,7 +837,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "rizz_macros"
+name = "rizz_db_macros"
 version = "0.1.0"
 dependencies = [
  "proc-macro-error",
@@ -855,6 +857,7 @@ dependencies = [
  "fallible-streaming-iterator",
  "hashlink",
  "libsqlite3-sys",
+ "serde_json",
  "smallvec",
 ]
 
@@ -894,7 +897,7 @@ dependencies = [
  "chrono",
  "enum_router",
  "hyped",
- "rizz",
+ "rizz_db",
  "serde",
  "serde-xml-rs",
  "static_stash",

@@ -3,9 +3,8 @@ use axum::{
     response::{IntoResponse, Response},
 };
 use chrono::DateTime;
-pub use rizz::desc;
-use rizz::*;
-use serde::{Deserialize, Serialize};
+pub use rizz_db::*;
+use serde::Deserialize;
 use std::sync::OnceLock;
 
 #[allow(unused)]
@@ -31,7 +30,7 @@ pub enum Error {
     Join(#[from] tokio::task::JoinError),
 }
 
-pub type Result<T> = std::result::Result<T, Error>;
+pub type Result<T> = core::result::Result<T, Error>;
 
 fn not_found(error: Error) -> Response {
     (StatusCode::NOT_FOUND, error.to_string()).into_response()
@@ -57,11 +56,11 @@ impl IntoResponse for Error {
     }
 }
 
-impl From<rizz::Error> for Error {
-    fn from(value: rizz::Error) -> Self {
+impl From<rizz_db::Error> for Error {
+    fn from(value: rizz_db::Error) -> Self {
         match value {
-            rizz::Error::RowNotFound => Error::NotFound,
-            rizz::Error::Database(err) => Error::Database(err),
+            rizz_db::Error::RowNotFound => Error::NotFound,
+            rizz_db::Error::Database(err) => Error::Database(err),
             _ => Error::InternalServer,
         }
     }
@@ -69,67 +68,46 @@ impl From<rizz::Error> for Error {
 
 static DATABASE: OnceLock<Database> = OnceLock::new();
 
-pub async fn db() -> &'static Database {
+pub async fn db() -> Result<&'static Database> {
     match DATABASE.get() {
-        Some(db) => db,
+        Some(db) => Ok(db),
         None => {
-            let connection = Connection::new("db.sqlite3")
-                .create_if_missing(true)
-                .journal_mode(JournalMode::Wal)
-                .synchronous(Synchronous::Normal)
-                .open()
-                .await
-                .expect("Could not open db connection");
-
-            let db = rizz::Database::new(connection);
-            let _ = migrate(&db).await.expect("Failed to migrate");
-            DATABASE.set(Database::new(db, Posts::new())).unwrap();
-            DATABASE.get().unwrap()
+            let db = Database::new("db.sqlite3").await?;
+            DATABASE.set(db).unwrap();
+            Ok(DATABASE
+                .get()
+                .ok_or(Error::Database("Database could not init".into()))?)
         }
     }
 }
 
-async fn migrate(db: &rizz::Database) -> Result<()> {
-    let posts = Posts::new();
-
-    db.create_table(posts)
-        .create_unique_index(posts, vec![posts.link])
-        .migrate()
-        .await?;
-
-    Ok(())
-}
-
-#[derive(Debug, Clone)]
+#[database]
 pub struct Database {
-    pub db: rizz::Database,
     pub posts: Posts,
 }
 
-impl Database {
-    pub fn new(db: rizz::Database, posts: Posts) -> Self {
-        Self { db, posts }
-    }
-}
-
-#[derive(Table, Clone, Copy, Debug)]
-#[rizz(table = "posts")]
+#[table("posts")]
 pub struct Posts {
     #[rizz(primary_key, not_null)]
     pub id: Text,
+
     #[rizz(not_null)]
     pub source: Text,
+
     #[rizz(not_null)]
     pub title: Text,
+
     #[rizz(not_null)]
     pub link: Text,
+
     #[rizz(not_null)]
     pub created_at: Integer,
+
     #[rizz(not_null)]
     pub source_link: Text,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[row]
 pub struct Post {
     pub id: String,
     pub source: String,
@@ -138,6 +116,7 @@ pub struct Post {
     pub created_at: u64,
     pub source_link: String,
 }
+
 impl Post {
     pub fn source_display(&self) -> &'static str {
         match self.source.as_str() {
@@ -158,12 +137,16 @@ pub async fn import() -> Result<()> {
     download("https://hnrss.org/newest.atom?q=rust").await?;
     println!("Finished importing atom feeds");
     // YT videos?
-    // hacker news links?
+    // twitter ?
+    // mastodon ?
+    // blogs ?
+    // popular crates ?
     Ok(())
 }
 
 async fn download(url: &'static str) -> Result<()> {
-    let Database { db, posts } = db().await;
+    let db = db().await?;
+    let Database { posts } = db;
     let xml = fetch(url)?;
     let feed = atom_feed(&xml)?;
     for entry in feed.entry {
@@ -188,7 +171,7 @@ async fn download(url: &'static str) -> Result<()> {
         let _rows_affected = match db.insert(posts).values(post)?.rows_affected().await {
             Ok(_) => {}
             Err(err) => match err {
-                rizz::Error::UniqueConstraint(_x) => {
+                rizz_db::Error::UniqueConstraint(_x) => {
                     // ignore unique constraint violations because i don't care
                 }
                 _ => {

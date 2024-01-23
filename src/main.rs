@@ -6,7 +6,7 @@ use axum::{
 };
 use enum_router::Routes;
 use hyped::*;
-use rizz::{eq, gt_or_eq};
+use rizz_db::*;
 use rustnews::*;
 use static_stash::{Css, Js, StaticFiles};
 use std::time::Duration;
@@ -14,7 +14,14 @@ use std::time::Duration;
 #[tokio::main]
 async fn main() -> Result<()> {
     let _ = StaticFile::once();
-    let _ = db().await;
+    let db = db().await?;
+    let Database { posts } = &db;
+    db.create(
+        rizz_db::index("posts_link_ix")
+            .unique()
+            .on(posts, posts.link),
+    )
+    .await?;
     let importer = tokio::task::spawn(async {
         let mut interval = tokio::time::interval(Duration::from_secs(3600));
 
@@ -47,21 +54,23 @@ fn routes() -> Router {
 }
 
 async fn index() -> Result<impl IntoResponse> {
-    let Database { db, posts } = db().await;
+    let today = (now() - DAY) as i64;
+    let db = db().await?;
+    let Database { posts } = db;
     let posts: Vec<Post> = db
-        .select()
+        .select(())
         .from(posts)
         .order(vec![desc(posts.created_at)])
-        .r#where(gt_or_eq(posts.created_at, now() - DAY))
+        .r#where(gte(posts.created_at, today))
         .all()
         .await?;
 
     render((
         h1("rust news").class("text-2xl text-center pt-8"),
-        div((posts
+        div(posts
             .into_iter()
             .map(|post| render_post(post))
-            .collect::<Vec<_>>(),))
+            .collect::<Vec<_>>())
         .class("flex flex-col gap-8 pt-8"),
     ))
 }
