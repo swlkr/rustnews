@@ -14,7 +14,7 @@ use std::time::Duration;
 #[tokio::main]
 async fn main() -> Result<()> {
     let _ = StaticFile::once();
-    let db = db().await?;
+    let _ = db().await?;
     let importer = tokio::task::spawn(async {
         let mut interval = tokio::time::interval(Duration::from_secs(3600));
 
