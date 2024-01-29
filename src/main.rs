@@ -47,11 +47,10 @@ fn routes() -> Router {
 
 async fn index() -> Result<Html<String>> {
     let today = (now() - DAY) as i64;
-    let db = db().await?;
-    let posts = Post::table(&db).await?;
+    let Database { db, posts } = db().await?;
     let posts: Vec<Post> = db
         .select(())
-        .from(posts)
+        .from(*posts)
         .order(vec![desc(posts.created_at)])
         .r#where(gte(posts.created_at, today))
         .all()

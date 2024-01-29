@@ -55,17 +55,23 @@ impl IntoResponse for Error {
     }
 }
 
+#[derive(Debug)]
+pub struct Database {
+    pub db: ryzz::Database,
+    pub posts: PostTable,
+}
+
 static DATABASE: OnceLock<Database> = OnceLock::new();
 
 pub async fn db() -> Result<&'static Database> {
     match DATABASE.get() {
         Some(db) => Ok(db),
         None => {
-            let db = Database::new("db.sqlite3").await?;
+            let db = ryzz::Database::new("db.sqlite3").await?;
             let posts = Post::table(&db).await?;
             let posts_link_ix = index("posts_link_ix").unique().on(posts, posts.link);
             db.create(&posts_link_ix).await?;
-            DATABASE.set(db).unwrap();
+            DATABASE.set(Database { db, posts }).unwrap();
             Ok(DATABASE.get().ok_or(ryzz::Error::ConnectionClosed)?)
         }
     }
@@ -110,8 +116,7 @@ pub async fn import() -> Result<()> {
 }
 
 async fn download(url: &'static str) -> Result<()> {
-    let db = db().await?;
-    let posts = Post::table(&db).await?;
+    let Database { db, posts } = db().await?;
     let xml = fetch(url)?;
     let feed = atom_feed(&xml)?;
     for entry in feed.entry {
@@ -133,7 +138,7 @@ async fn download(url: &'static str) -> Result<()> {
             link: entry.link.href,
             created_at: to_seconds(&entry.updated.unwrap_or_default()).unwrap_or_default(),
         };
-        let _rows_affected = match db.insert(posts).values(post)?.rows_affected().await {
+        let _rows_affected = match db.insert(*posts).values(post)?.rows_affected().await {
             Ok(_) => {}
             Err(err) => match err {
                 ryzz::Error::UniqueConstraint(_x) => {
