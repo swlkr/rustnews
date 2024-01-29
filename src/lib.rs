@@ -3,17 +3,16 @@ use axum::{
     response::{IntoResponse, Response},
 };
 use chrono::DateTime;
-pub use rizz_db::*;
+pub use ryzz::*;
 use serde::Deserialize;
 use std::sync::OnceLock;
 
-#[allow(unused)]
 #[derive(thiserror::Error, Debug)]
 pub enum Error {
     #[error("not found")]
     NotFound,
     #[error("database error: {0}")]
-    Database(String),
+    Database(#[from] ryzz::Error),
     #[error("internal server error")]
     InternalServer,
     #[error("row not found")]
@@ -56,16 +55,6 @@ impl IntoResponse for Error {
     }
 }
 
-impl From<rizz_db::Error> for Error {
-    fn from(value: rizz_db::Error) -> Self {
-        match value {
-            rizz_db::Error::RowNotFound => Error::NotFound,
-            rizz_db::Error::Database(err) => Error::Database(err),
-            _ => Error::InternalServer,
-        }
-    }
-}
-
 static DATABASE: OnceLock<Database> = OnceLock::new();
 
 pub async fn db() -> Result<&'static Database> {
@@ -73,50 +62,23 @@ pub async fn db() -> Result<&'static Database> {
         Some(db) => Ok(db),
         None => {
             let db = Database::new("db.sqlite3").await?;
-            let Database { posts } = &db;
-            db.create(&index("posts_link_ix").unique().on(posts, posts.link))
-                .await?;
+            let posts = Post::table(&db).await?;
+            let posts_link_ix = index("posts_link_ix").unique().on(posts, posts.link);
+            db.create(&posts_link_ix).await?;
             DATABASE.set(db).unwrap();
-            Ok(DATABASE
-                .get()
-                .ok_or(Error::Database("Database could not init".into()))?)
+            Ok(DATABASE.get().ok_or(ryzz::Error::ConnectionClosed)?)
         }
     }
 }
 
-#[database]
-pub struct Database {
-    pub posts: Posts,
-}
-
 #[table("posts")]
-pub struct Posts {
-    #[rizz(primary_key, not_null)]
-    pub id: Text,
-
-    #[rizz(not_null)]
-    pub source: Text,
-
-    #[rizz(not_null)]
-    pub title: Text,
-
-    #[rizz(not_null)]
-    pub link: Text,
-
-    #[rizz(not_null)]
-    pub created_at: Integer,
-
-    #[rizz(not_null)]
-    pub source_link: Text,
-}
-
-#[row]
 pub struct Post {
+    #[ryzz(pk)]
     pub id: String,
     pub source: String,
     pub title: String,
     pub link: String,
-    pub created_at: u64,
+    pub created_at: i64,
     pub source_link: String,
 }
 
@@ -149,7 +111,7 @@ pub async fn import() -> Result<()> {
 
 async fn download(url: &'static str) -> Result<()> {
     let db = db().await?;
-    let Database { posts } = db;
+    let posts = Post::table(&db).await?;
     let xml = fetch(url)?;
     let feed = atom_feed(&xml)?;
     for entry in feed.entry {
@@ -174,7 +136,7 @@ async fn download(url: &'static str) -> Result<()> {
         let _rows_affected = match db.insert(posts).values(post)?.rows_affected().await {
             Ok(_) => {}
             Err(err) => match err {
-                rizz_db::Error::UniqueConstraint(_x) => {
+                ryzz::Error::UniqueConstraint(_x) => {
                     // ignore unique constraint violations because i don't care
                 }
                 _ => {
@@ -187,8 +149,8 @@ async fn download(url: &'static str) -> Result<()> {
     Ok(())
 }
 
-fn to_seconds(input: &str) -> Result<u64> {
-    Ok(DateTime::parse_from_rfc3339(input)?.timestamp() as u64)
+fn to_seconds(input: &str) -> Result<i64> {
+    Ok(DateTime::parse_from_rfc3339(input)?.timestamp() as i64)
 }
 
 fn ulid() -> String {

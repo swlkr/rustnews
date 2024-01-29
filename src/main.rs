@@ -6,7 +6,6 @@ use axum::{
 };
 use enum_router::Routes;
 use hyped::*;
-use rizz_db::*;
 use rustnews::*;
 use static_stash::{Css, Js, StaticFiles};
 use std::time::Duration;
@@ -46,10 +45,10 @@ fn routes() -> Router {
     Route::router().route("/*file", get(serve_file))
 }
 
-async fn index() -> Result<impl IntoResponse> {
+async fn index() -> Result<Html<String>> {
     let today = (now() - DAY) as i64;
     let db = db().await?;
-    let Database { posts } = db;
+    let posts = Post::table(&db).await?;
     let posts: Vec<Post> = db
         .select(())
         .from(posts)
@@ -143,19 +142,19 @@ fn a(s: impl Render + 'static) -> Element {
         .class("underline dark:text-orange-400 text-orange-500 w-fit")
 }
 
-fn now() -> u64 {
+fn now() -> i64 {
     use std::time::{SystemTime, UNIX_EPOCH};
     let now = SystemTime::now();
-    now.duration_since(UNIX_EPOCH).unwrap().as_secs()
+    now.duration_since(UNIX_EPOCH).unwrap().as_secs() as i64
 }
 
-const YEAR: u64 = 31_536_000;
-const MONTH: u64 = 2_592_000;
-const DAY: u64 = 86_400;
-const HOUR: u64 = 3600;
-const MINUTE: u64 = 60;
+const YEAR: i64 = 31_536_000;
+const MONTH: i64 = 2_592_000;
+const DAY: i64 = 86_400;
+const HOUR: i64 = 3600;
+const MINUTE: i64 = 60;
 
-fn time_ago(seconds: u64) -> impl Render {
+fn time_ago(seconds: i64) -> impl Render {
     let now = now();
     let seconds = now - seconds;
 
