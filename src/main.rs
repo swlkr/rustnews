@@ -21,7 +21,11 @@ async fn main() -> Result<()> {
             interval.tick().await;
             match import().await {
                 Ok(_) => {}
-                Err(err) => return err,
+                Err(err) => {
+                    // return didn't do anything
+                    // show import errors in logs
+                    dbg!(err);
+                }
             };
         }
     });

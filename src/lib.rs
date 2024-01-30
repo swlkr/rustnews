@@ -141,9 +141,27 @@ async fn download(url: &'static str) -> Result<()> {
         let _rows_affected = match db.insert(*posts).values(post)?.rows_affected().await {
             Ok(_) => {}
             Err(err) => match err {
-                ryzz::Error::UniqueConstraint(_x) => {
-                    // ignore unique constraint violations because i don't care
-                }
+                ryzz::Error::TokioRusqlite(tre) => match tre {
+                    tokio_rusqlite::Error::Rusqlite(re) => match re {
+                        rusqlite::Error::SqliteFailure(error, message) => match error.code {
+                            rusqlite::ffi::ErrorCode::ConstraintViolation => match message {
+                                Some(s) => {
+                                    // TODO expose common ffi error codes in ryzz
+                                    // TODO this is a disaster area
+                                    // TODO classic rust reverse stack trace
+                                    // ignore unique constraint on posts.link
+                                    if s == "UNIQUE constraint failed: posts.link" {
+                                        ()
+                                    }
+                                }
+                                None => todo!(),
+                            },
+                            _ => todo!(),
+                        },
+                        _ => todo!(),
+                    },
+                    _ => todo!(),
+                },
                 _ => {
                     return Err(err.into());
                 }
